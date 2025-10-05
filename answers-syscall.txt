@@ -1,0 +1,25 @@
+GDB excercise answers
+1. Looking at the backtrace output, which function called syscall?
+usertrap
+
+2. What is the value of p->trapframe->a7 and what does that value represent?
+- Value: 0xf
+- Represents: This value represents the system call number that the user program requested.
+
+3. What was the previous mode that the CPU was in? (from $sstatus)
+- User mode 
+
+4. Write down the assembly instruction the kernel is panicing at. Which register corresponds to the variable num?
+- Assembly instruction: lw a3,0(zero)
+- Register for num: a3
+
+5. Why does the kernel crash? (Hint: is address 0 mapped? What does scause say?)
+-The kernel crashes because it tries to dereference address 0 (i.e., access memory at address 0),
+ which is not mapped in the kernel address space. This causes a page fault. 
+ The scause value printed by the kernel indicates a load access fault,
+ confirming that the kernel attempted to access an invalid (unmapped) address.
+ In RISC-V, address 0 is never mapped for the kernel, so any access to it will result in a fault and a kernel panic.
+
+6. What is the name of the process that was running when the kernel paniced? What is its process id (pid)?
+- Name: init
+- PID: 1
