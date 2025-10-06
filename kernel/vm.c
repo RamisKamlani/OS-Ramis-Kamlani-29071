@@ -142,16 +142,43 @@ walkaddr(pagetable_t pagetable, uint64 va)
 
 
 #if defined(LAB_PGTBL) || defined(SOL_MMAP) || defined(SOL_COW)
+// Helper function to recursively print page table entries
+void
+vmprint_recursive(pagetable_t pagetable, int level)
+{
+  // there are 2^9 = 512 PTEs in a page table.
+  for(int i = 0; i < 512; i++){
+    pte_t pte = pagetable[i];
+    if(pte & PTE_V){
+      // Print indentation based on level
+      for(int j = 0; j < level; j++){
+        printf(" ..");
+      }
+      
+      uint64 pa = PTE2PA(pte);
+      printf("%d: pte 0x%lx pa 0x%lx\n", i, pte, pa);
+      
+      // If this is not a leaf page (has no read/write/execute bits),
+      // recursively print the next level
+      if((pte & (PTE_R|PTE_W|PTE_X)) == 0){
+        uint64 child = PTE2PA(pte);
+        vmprint_recursive((pagetable_t)child, level + 1);
+      }
+    }
+  }
+}
+
 void
 vmprint(pagetable_t pagetable) {
   // your code here
+printf("page table %p\n", pagetable);
+  vmprint_recursive(pagetable, 1);
 }
 #endif
 
 
 
 // add a mapping to the kernel page table.
-// only used when booting.
 // does not flush TLB or enable paging.
 void
 kvmmap(pagetable_t kpgtbl, uint64 va, uint64 pa, uint64 sz, int perm)
