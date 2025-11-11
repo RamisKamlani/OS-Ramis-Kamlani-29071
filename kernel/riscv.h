@@ -336,6 +336,15 @@ r_ra()
   return x;
 }
 
+//Helper function ro read the s0 register 
+static inline uint64
+r_fp()
+{
+  uint64 x;
+  asm volatile("mv %0, s0" : "=r" (x) );
+  return x;
+}
+
 // flush the TLB.
 static inline void
 sfence_vma()

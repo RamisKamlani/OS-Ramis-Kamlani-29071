@@ -149,3 +149,29 @@ printfinit(void)
 {
   initlock(&pr.lock, "pr");
 }
+
+
+void
+backtrace(void)
+{
+  uint64 fp = r_fp(); // Get the current frame pointer
+  uint64 stack_page_bottom = PGROUNDDOWN(fp); // Get the page this stack is on
+
+  printf("backtrace:\n");
+
+  while (PGROUNDDOWN(fp) == stack_page_bottom) {
+    // The saved return address is at offset whihc  is -8 from the frame pointer
+    uint64 saved_ra = *(uint64*)(fp - 8);
+    
+    printf("%p\n", (void *)saved_ra);
+
+    // The saved frame pointer of the caller is at offset -16
+    uint64 saved_fp = *(uint64*)(fp - 16);
+
+   if (saved_fp == 0 || saved_fp <= fp) {
+      break;
+    }
+
+    fp = saved_fp;
+  }
+}
