@@ -81,9 +81,25 @@ usertrap(void)
     kexit(-1);
 
   // give up the CPU if this is a timer interrupt.
-  if(which_dev == 2)
+  if(which_dev == 2){ //timer interrupt
+struct proc *p = myproc();
+    // Check if an alarm is active
+    if(p->alarm_interval > 0) {
+      p->alarm_ticks_left--; // Count down
+      // If timer expires AND we are not already in the handler
+      if(p->alarm_ticks_left == 0 && p->alarm_handling == 0) {
+        // 1. Set flag to prevent re-entry
+        p->alarm_handling = 1;
+        // 2. Save a complete copy of the trapframe
+        p->alarm_trapframe_backup = *(p->trapframe);
+        // 3. Set the PC to execute the handler
+        p->trapframe->epc = (uint64)p->alarm_handler;
+        // 4. Reset the timer for the next period
+        p->alarm_ticks_left = p->alarm_interval;
+      }
+    }
     yield();
-
+}
   prepare_return();
 
   // the user page table to switch to, for trampoline.S

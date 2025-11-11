@@ -107,3 +107,30 @@ sys_uptime(void)
   release(&tickslock);
   return xticks;
 }
+
+
+uint64
+sys_sigalarm(void)
+{
+  int interval;
+  uint64 handler_addr;
+  struct proc *p = myproc();
+  // Getting arguments from user space
+  argint(0, &interval);
+  argaddr(1, &handler_addr);
+  p->alarm_interval = interval;
+  p->alarm_handler = (void (*)())handler_addr;
+  // Starting countdown
+  p->alarm_ticks_left = interval;
+  return 0;
+}
+
+uint64
+sys_sigreturn(void)
+{
+  struct proc *p = myproc();
+  //Restore the original trapframe from our backup
+  *(p->trapframe) = p->alarm_trapframe_backup;
+  p->alarm_handling = 0;
+  return p->trapframe->a0;
+}
