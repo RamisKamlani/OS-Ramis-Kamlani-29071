@@ -1,0 +1,69 @@
+Here is the text for your answers-pgtbl.txt file. You can copy and paste the entire content below into your file.
+
+Answers for Lab: Page Tables
+
+---
+### Inspect a user-process page table
+
+Here is an analysis of the page table entries (PTEs) from the `pgtbltest` output, based on the permission bits (PTE_V, R, W, X, U) defined in `kernel/riscv.h`.
+
+**`va 0 pte 0x21FCF45B pa 0x87F3D000 perm 0x5B`**
+* **Permissions (0x5B):** `V+R+X+U+A` (Valid, Read, Execute, User, Accessed).
+* **Logical Content:** This is a user-code page (text segment). It is mapped into the user's address space (`U=1`) and is executable (`X=1`) but not writable (`W=0`).
+
+**`va 1000 pte 0x21FCE85B pa 0x87F3A000 perm 0x5B`**
+* **Permissions (0x5B):** `V+R+X+U+A` (Valid, Read, Execute, User, Accessed).
+* **Logical Content:** This is another user-code page, just like `va 0`. The output shows that `pgtbltest` maps multiple pages for its code.
+
+**`va 0xFFFFD000 pte 0x0 pa 0x0 perm 0x0`**
+* **Permissions (0x0):** No bits are set. The `V` (Valid) bit is 0.
+* **Logical Content:** This is an unmapped page. Any attempt to access this virtual address would result in a page fault. This page acts as a "guard page" below the high-memory kernel mappings.
+
+**`va 0xFFFFE000 pte 0x21FD80C7 pa 0x87F60000 perm 0xC7`**
+* **Permissions (0xC7):** `V+R+W+A+D` (Valid, Read, Write, Accessed, Dirty).
+* **Logical Content:** This page is the **trapframe**. Critically, the `U` (User) bit is **not** set, meaning this page is inaccessible from user-mode code. It is mapped as Read/Write (`W=1`) so the kernel can save and restore user registers when handling traps. It is mapped at `TRAMPOLINE - PGSIZE`.
+
+**`va 0xFFFFF000 pte 0x20001C4B pa 0x80007000 perm 0x4B`**
+* **Permissions (0x4B):** `V+R+X+A` (Valid, Read, Execute, Accessed).
+* **Logical Content:** This page is the **trampoline**. Like the trapframe, the `U` bit is **not** set, making it kernel-only. It is mapped as Read/Execute (`X=1`) but *not* writable (`W=0`). This page contains the code that switches between user and kernel mode during a system call or interrupt.
+
+---
+### Speed up system calls
+
+**Which other xv6 system call(s) could be made faster using this shared page? Explain how.**
+
+Any system call that returns a small, relatively static piece of information known to the kernel could be sped up. The goal is to avoid the cost of the `ecall` trap and kernel-mode context switch.
+
+1.  **`getppid()`:** This is a perfect candidate. Like `getpid()`, a process's parent PID (`ppid`) is set when the process is created (by `fork`) and does not change. The kernel could store the `ppid` in the `struct usyscall` page right next to the `pid`, allowing user code to read it instantly.
+
+2.  **`uptime()`:** This is another good candidate, though slightly different. The `uptime()` value *changes* (it's the number of clock ticks). The kernel could update a field in the `struct usyscall` page on every clock interrupt (`tick()`). User processes would get a slightly-less-than-perfectly-accurate value (it might be off by one tick), but they could read it without any system call overhead, which is a very good trade-off.
+
+---
+### Print a page table
+
+**For every leaf page in the `vmprint` output, explain what it logically contains and what its permission bits are, and how it relates to the output of the earlier `print_pgtbl()` exercise above.**
+
+The `vmprint` output shows the *entire 3-level page table structure*, while `print_pgtbl` just samples a few *final* (leaf) mappings.
+
+* **Intermediate PTEs (e.g., `...801`):** These PTEs have only the `V` (Valid) bit set. They are not leaves; they point to the *next level* of the page table tree.
+* **Leaf PTEs:** These have `R`, `W`, or `X` bits set and point to actual physical pages of data or code.
+
+Analysis of the leaf PTEs from the `vmprint` example:
+
+**Low-Memory User Pages:**
+* `.. .. ..0x000...0000: pte ...7c5b` (perm `0x5B` -> `V+R+X+U+A`)
+* **Logical Content:** This is a user text (code) page. It is Read-only, Executable, and User-accessible.
+* **Relation:** This **is** the exact same type of mapping shown by `va 0 ... perm 0x5B` in the `print_pgtbl` output. `vmprint` shows the 3-level walk required to find this mapping.
+
+* `.. .. ..0x000...1000: pte ...70d7` (perm `0xD7` -> `V+R+W+U+A+D`)
+* **Logical Content:** This is a user data page (e.g., stack or heap). It is Read/Write and User-accessible.
+* **Relation:** This corresponds to user data pages. The `print_pgtbl` output sampled `va 1000` but showed different permissions, likely because the two outputs are from different test programs or different moments in execution.
+
+**High-Memory Kernel Pages:**
+* `.. .. ..0xfff...e000: pte ...00c7` (perm `0xC7` -> `V+R+W+A+D`)
+* **Logical Content:** This is the **trapframe** page. It is kernel-only (`U=0`) and Read/Write.
+* **Relation:** This **directly corresponds** to the `va 0xFFFFE000 ... perm 0xC7` line from the `print_pgtbl` output.
+
+* `.. .. ..0xfff...f000: pte ...184b` (perm `0x4B` -> `V+R+X+A`)
+* **Logical Content:** This is the **trampoline** page. It is kernel-only (`U=0`) and Read/Execute.
+* **Relation:** This **directly corresponds** to the `va 0xFFFFF000 ... perm 0x4B` line f
